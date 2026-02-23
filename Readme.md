@@ -1,7 +1,7 @@
 # Проект «Большое путешествие»
 
 * Студент: [Тимур Чащин](https://up.htmlacademy.ru/univer-js2/6/user/2629691).
-* Наставник: `Неизвестно`.
+* Наставник: `Александр Сударев`.
 
 ---
 
@@ -50,3 +50,4 @@ git clone SSH-адрес_вашего_форка
 
 [check-image]: https://github.com/htmlacademy-ecmascript/2629691-big-trip-6/workflows/Project%20check/badge.svg?branch=master
 [check-url]: https://github.com/htmlacademy-ecmascript/2629691-big-trip-6/actions
+
