@@ -11,6 +11,7 @@ export default class PointsModel extends Observable {
   #filters = filters;
   #sorts = sorts;
   #tripApiService = null;
+  #isLoadingError = false;
 
   constructor({tripApiService}) {
     super();
@@ -41,22 +42,35 @@ export default class PointsModel extends Observable {
     return this.#sorts;
   }
 
-  async init() {
-    try {
-      const [points, destinations, offers] = await Promise.all([
-        this.#tripApiService.points,
-        this.#tripApiService.destinations,
-        this.#tripApiService.offers,
-      ]);
+  get isLoadingError() {
+    return this.#isLoadingError;
+  }
 
-      this.#points = points;
-      this.#destinations = destinations;
-      this.#offers = offers;
-    } catch (err) {
+  async init() {
+    const results = await Promise.allSettled([
+      this.#tripApiService.points,
+      this.#tripApiService.destinations,
+      this.#tripApiService.offers,
+    ]);
+
+    const isRejected = results.some((result) => result.status === 'rejected');
+
+    if (isRejected) {
       this.#points = [];
       this.#destinations = [];
       this.#offers = [];
+      this.#isLoadingError = true;
+
+      this._notify(UpdateType.INIT);
+      return;
     }
+
+    const [pointsResult, destinationsResult, offersResult] = results;
+
+    this.#points = pointsResult.value;
+    this.#destinations = destinationsResult.value;
+    this.#offers = offersResult.value;
+    this.#isLoadingError = false;
 
     this._notify(UpdateType.INIT);
   }

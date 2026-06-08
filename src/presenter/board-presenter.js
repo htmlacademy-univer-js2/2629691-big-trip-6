@@ -1,6 +1,6 @@
 import UiBlocker from '../framework/ui-blocker/ui-blocker.js';
 import {remove, render} from '../framework/render.js';
-import {UpdateType, UserAction} from '../const.js';
+import {FilterType, UpdateType, UserAction} from '../const.js';
 import {filter} from '../utils/filter.js';
 import SortView from '../view/sort-view.js';
 import TripEventsView from '../view/trip-events-view.js';
@@ -8,8 +8,7 @@ import TripEventsListView from '../view/trip-events-list-view.js';
 import NoPointView from '../view/no-point-view.js';
 import LoadingView from '../view/loading-view.js';
 import PointPresenter from './point-presenter.js';
-
-const POINTS_COUNT = 3;
+import NewPointPresenter from './new-point-presenter.js';
 
 const TimeLimit = {
   LOWER_LIMIT: 350,
@@ -40,6 +39,7 @@ function sortPointsByPrice(firstPoint, secondPoint) {
 
 export default class BoardPresenter {
   #boardContainer = null;
+  #newPointButtonElement = null;
   #pointsModel = null;
   #filterModel = null;
 
@@ -48,6 +48,7 @@ export default class BoardPresenter {
   #sortComponent = null;
   #noPointComponent = null;
   #loadingComponent = new LoadingView();
+  #newPointPresenter = null;
 
   #pointPresenters = new Map();
   #points = [];
@@ -59,13 +60,17 @@ export default class BoardPresenter {
     upperLimit: TimeLimit.UPPER_LIMIT,
   });
 
-  constructor({boardContainer, pointsModel, filterModel}) {
+  constructor({boardContainer, newPointButtonElement, pointsModel, filterModel}) {
     this.#boardContainer = boardContainer;
+    this.#newPointButtonElement = newPointButtonElement;
     this.#pointsModel = pointsModel;
     this.#filterModel = filterModel;
 
     this.#pointsModel.addObserver(this.#handleModelEvent);
     this.#filterModel.addObserver(this.#handleModelEvent);
+
+    this.#newPointButtonElement.disabled = true;
+    this.#newPointButtonElement.addEventListener('click', this.#handleNewPointButtonClick);
   }
 
   init() {
@@ -130,7 +135,11 @@ export default class BoardPresenter {
   }
 
   #renderNoPoints() {
-    this.#noPointComponent = new NoPointView();
+    this.#noPointComponent = new NoPointView({
+      filterType: this.#filterModel.filter,
+      isLoadingError: this.#pointsModel.isLoadingError,
+    });
+
     render(this.#noPointComponent, this.#tripEventsComponent.element);
   }
 
@@ -154,9 +163,22 @@ export default class BoardPresenter {
   }
 
   #renderPoints() {
-    this.#getSortedPoints().slice(0, POINTS_COUNT).forEach((point) => {
+    this.#getSortedPoints().forEach((point) => {
       this.#renderPoint(point);
     });
+  }
+
+  #renderNewPoint() {
+    this.#newPointPresenter = new NewPointPresenter({
+      pointContainer: this.#tripEventsListComponent.element,
+      destinations: this.#pointsModel.destinations,
+      offers: this.#pointsModel.offers,
+      eventTypes: this.#pointsModel.eventTypes,
+      onDataChange: this.#handleViewAction,
+      onDestroy: this.#handleNewPointDestroy,
+    });
+
+    this.#newPointPresenter.init();
   }
 
   #clearPoints() {
@@ -167,7 +189,17 @@ export default class BoardPresenter {
     this.#pointPresenters.clear();
   }
 
+  #clearNewPoint() {
+    if (this.#newPointPresenter === null) {
+      return;
+    }
+
+    this.#newPointPresenter.destroy();
+    this.#newPointPresenter = null;
+  }
+
   #clearBoard() {
+    this.#clearNewPoint();
     this.#clearPoints();
 
     remove(this.#sortComponent);
@@ -206,6 +238,7 @@ export default class BoardPresenter {
         this.#renderBoard();
         break;
       case UpdateType.MINOR:
+        this.#newPointButtonElement.disabled = false;
         this.#clearBoard();
         this.#points = this.#getFilteredPoints();
         this.#renderBoard();
@@ -218,6 +251,7 @@ export default class BoardPresenter {
         break;
       case UpdateType.INIT:
         this.#isLoading = false;
+        this.#newPointButtonElement.disabled = false;
         this.#clearBoard();
         this.#points = this.#getFilteredPoints();
         this.#renderBoard();
@@ -226,9 +260,39 @@ export default class BoardPresenter {
   };
 
   #handleModeChange = () => {
+    this.#clearNewPoint();
+    this.#newPointButtonElement.disabled = false;
+
     this.#pointPresenters.forEach((presenter) => {
       presenter.resetView();
     });
+  };
+
+  #handleNewPointButtonClick = (evt) => {
+    evt.preventDefault();
+
+    this.#currentSortType = SortType.DAY;
+    this.#filterModel.setFilter(UpdateType.MAJOR, FilterType.EVERYTHING);
+    this.#handleModeChange();
+
+    if (this.#points.length === 0) {
+      remove(this.#noPointComponent);
+      render(this.#tripEventsListComponent, this.#tripEventsComponent.element);
+    }
+
+    this.#newPointButtonElement.disabled = true;
+    this.#renderNewPoint();
+  };
+
+  #handleNewPointDestroy = () => {
+    this.#clearNewPoint();
+    this.#newPointButtonElement.disabled = false;
+
+    if (this.#points.length === 0) {
+      remove(this.#tripEventsListComponent);
+      this.#tripEventsListComponent = new TripEventsListView();
+      this.#renderNoPoints();
+    }
   };
 
   #handleSortTypeChange = (sortType) => {

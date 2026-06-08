@@ -5,10 +5,11 @@ import FilterModel from './model/filter-model.js';
 import PointsModel from './model/points-model.js';
 import TripApiService from './trip-api-service.js';
 
-const END_POINT = 'https://21.objects.htmlacademy.pro/big-trip';
+const END_POINT = 'https://23.objects.htmlacademy.pro/big-trip';
 const AUTHORIZATION = 'Basic minikustik2006-big-trip-2629691';
 
 const tripMainElement = document.querySelector('.trip-main');
+const newPointButtonElement = document.querySelector('.trip-main__event-add-btn');
 const tripControlsFiltersElement = document.querySelector('.trip-controls__filters');
 const siteMainElement = document.querySelector('.page-main .page-body__container');
 const tripEventsElement = siteMainElement.querySelector('.trip-events');
@@ -36,6 +37,7 @@ filterPresenter.init();
 
 const boardPresenter = new BoardPresenter({
   boardContainer: siteMainElement,
+  newPointButtonElement,
   pointsModel,
   filterModel,
 });

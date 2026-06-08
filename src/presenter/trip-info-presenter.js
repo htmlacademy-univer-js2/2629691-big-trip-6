@@ -1,8 +1,13 @@
+import dayjs from 'dayjs';
 import {remove, render, replace, RenderPosition} from '../framework/render.js';
-import {getEventDate} from '../utils/point.js';
 import TripInfoView from '../view/trip-info-view.js';
 
 const MAX_ROUTE_DESTINATIONS = 3;
+const TRIP_DATE_FORMAT = 'DD MMM';
+
+function getTripDate(date) {
+  return dayjs(date).format(TRIP_DATE_FORMAT).toUpperCase();
+}
 
 function getDestinationById(destinations, destinationId) {
   return destinations.find((destination) => destination.id === destinationId);
@@ -42,7 +47,7 @@ function createTripDates(points) {
   const firstPoint = sortedPoints[0];
   const lastPoint = sortedPoints[sortedPoints.length - 1];
 
-  return `${getEventDate(firstPoint.startDateTime)}&nbsp;&mdash;&nbsp;${getEventDate(lastPoint.endDateTime)}`;
+  return `${getTripDate(firstPoint.startDateTime)}&nbsp;&mdash;&nbsp;${getTripDate(lastPoint.endDateTime)}`;
 }
 
 function calculateTripCost(points, offers) {

@@ -13,6 +13,10 @@ function createDisabledAttribute(isDisabled) {
   return isDisabled ? ' disabled' : '';
 }
 
+function createEventDateValue(date) {
+  return date ? getEditDate(date) : '';
+}
+
 function createEventTypeTemplate(eventType, checkedType, pointId, isDisabled) {
   const isChecked = eventType === checkedType ? ' checked' : '';
   const disabledAttribute = createDisabledAttribute(isDisabled);
@@ -53,6 +57,7 @@ function createOfferTemplate(offer, offerIds, pointId, isDisabled) {
         id="event-offer-${offer.id}-${pointId}"
         type="checkbox"
         name="event-offer-${offer.id}"
+        value="${offer.id}"
         ${isChecked}
         ${disabledAttribute}
       >
@@ -81,11 +86,8 @@ function createDestinationsTemplate(destinations) {
     .join('');
 }
 
-function createOffersTemplate(point) {
-  return point.offers
-    .filter((offer) => offer.type === point.type)
-    .map((offer) => createOfferTemplate(offer, point.offerIds, point.id, point.isDisabled))
-    .join('');
+function createAvailableOffers(point) {
+  return point.offers.filter((offer) => offer.type === point.type);
 }
 
 function createPhotosTemplate(photos) {
@@ -94,14 +96,72 @@ function createPhotosTemplate(photos) {
     .join('');
 }
 
+function createOffersSectionTemplate(point) {
+  const availableOffers = createAvailableOffers(point);
+
+  if (availableOffers.length === 0) {
+    return '';
+  }
+
+  return (
+    `<section class="event__section  event__section--offers">
+      <h3 class="event__section-title  event__section-title--offers">Offers</h3>
+
+      <div class="event__available-offers">
+        ${availableOffers
+      .map((offer) => createOfferTemplate(offer, point.offerIds, point.id, point.isDisabled))
+      .join('')}
+      </div>
+    </section>`
+  );
+}
+
+function createDestinationPhotosTemplate(destination) {
+  if (!destination.photos || destination.photos.length === 0) {
+    return '';
+  }
+
+  return (
+    `<div class="event__photos-container">
+      <div class="event__photos-tape">
+        ${createPhotosTemplate(destination.photos)}
+      </div>
+    </div>`
+  );
+}
+
+function createDestinationSectionTemplate(point) {
+  if (!point.destination) {
+    return '';
+  }
+
+  const hasDescription = Boolean(point.destination.description);
+  const hasPhotos = point.destination.photos && point.destination.photos.length > 0;
+
+  if (!hasDescription && !hasPhotos) {
+    return '';
+  }
+
+  return (
+    `<section class="event__section  event__section--destination">
+      <h3 class="event__section-title  event__section-title--destination">Destination</h3>
+      <p class="event__destination-description">${point.destination.description}</p>
+
+      ${createDestinationPhotosTemplate(point.destination)}
+    </section>`
+  );
+}
+
 function createEditPointTemplate(point) {
   const eventTypesTemplate = createEventTypesTemplate(point);
   const destinationsTemplate = createDestinationsTemplate(point.destinations);
-  const offersTemplate = createOffersTemplate(point);
-  const photosTemplate = createPhotosTemplate(point.destination.photos);
+  const offersSectionTemplate = createOffersSectionTemplate(point);
+  const destinationSectionTemplate = createDestinationSectionTemplate(point);
   const disabledAttribute = createDisabledAttribute(point.isDisabled);
+  const destinationName = point.destination ? point.destination.name : '';
   const saveButtonText = point.isSaving ? 'Saving...' : 'Save';
-  const deleteButtonText = point.isDeleting ? 'Deleting...' : 'Delete';
+  const resetButtonText = point.isNewPoint ? 'Cancel' : 'Delete';
+  const deleteButtonText = point.isDeleting ? 'Deleting...' : resetButtonText;
 
   return (
     `<li class="trip-events__item">
@@ -142,7 +202,7 @@ function createEditPointTemplate(point) {
               id="event-destination-${point.id}"
               type="text"
               name="event-destination"
-              value="${point.destination.name}"
+              value="${destinationName}"
               list="destination-list-${point.id}"
               ${disabledAttribute}
             >
@@ -158,7 +218,7 @@ function createEditPointTemplate(point) {
               id="event-start-time-${point.id}"
               type="text"
               name="event-start-time"
-              value="${getEditDate(point.startDateTime)}"
+              value="${createEventDateValue(point.startDateTime)}"
               ${disabledAttribute}
             >
             &mdash;
@@ -168,7 +228,7 @@ function createEditPointTemplate(point) {
               id="event-end-time-${point.id}"
               type="text"
               name="event-end-time"
-              value="${getEditDate(point.endDateTime)}"
+              value="${createEventDateValue(point.endDateTime)}"
               ${disabledAttribute}
             >
           </div>
@@ -192,33 +252,17 @@ function createEditPointTemplate(point) {
           <button class="event__save-btn  btn  btn--blue" type="submit" ${disabledAttribute}>
             ${saveButtonText}
           </button>
-          <button class="event__reset-btn" type="reset" ${disabledAttribute}>
+          <button class="event__reset-btn" type="reset">
             ${deleteButtonText}
           </button>
-          <button class="event__rollup-btn" type="button" ${disabledAttribute}>
+          <button class="event__rollup-btn" type="button">
             <span class="visually-hidden">Open event</span>
           </button>
         </header>
 
         <section class="event__details">
-          <section class="event__section  event__section--offers">
-            <h3 class="event__section-title  event__section-title--offers">Offers</h3>
-
-            <div class="event__available-offers">
-              ${offersTemplate}
-            </div>
-          </section>
-
-          <section class="event__section  event__section--destination">
-            <h3 class="event__section-title  event__section-title--destination">Destination</h3>
-            <p class="event__destination-description">${point.destination.description}</p>
-
-            <div class="event__photos-container">
-              <div class="event__photos-tape">
-                ${photosTemplate}
-              </div>
-            </div>
-          </section>
+          ${offersSectionTemplate}
+          ${destinationSectionTemplate}
         </section>
       </form>
     </li>`
@@ -296,6 +340,12 @@ export default class EditPointView extends AbstractStatefulView {
     this.element.querySelector('.event__input--destination').addEventListener('change', this.#destinationChangeHandler);
     this.element.querySelector('.event__input--price').addEventListener('input', this.#priceInputHandler);
 
+    const offersContainer = this.element.querySelector('.event__available-offers');
+
+    if (offersContainer) {
+      offersContainer.addEventListener('change', this.#offerChangeHandler);
+    }
+
     this.#setStartDatepicker();
     this.#setEndDatepicker();
   }
@@ -305,7 +355,7 @@ export default class EditPointView extends AbstractStatefulView {
       this.element.querySelector(`#event-start-time-${this._state.id}`),
       {
         dateFormat: FLATPICKR_DATE_FORMAT,
-        defaultDate: this._state.startDateTime,
+        defaultDate: this._state.startDateTime || null,
         enableTime: true,
         'time_24hr': true,
         onChange: this.#startDateChangeHandler,
@@ -318,7 +368,7 @@ export default class EditPointView extends AbstractStatefulView {
       this.element.querySelector(`#event-end-time-${this._state.id}`),
       {
         dateFormat: FLATPICKR_DATE_FORMAT,
-        defaultDate: this._state.endDateTime,
+        defaultDate: this._state.endDateTime || null,
         enableTime: true,
         'time_24hr': true,
         onChange: this.#endDateChangeHandler,
@@ -345,11 +395,21 @@ export default class EditPointView extends AbstractStatefulView {
 
   #rollupClickHandler = (evt) => {
     evt.preventDefault();
+
+    if (this._state.isDisabled) {
+      return;
+    }
+
     this.#handleRollupClick();
   };
 
   #deleteClickHandler = (evt) => {
     evt.preventDefault();
+
+    if (this._state.isDisabled) {
+      return;
+    }
+
     this.#handleDeleteClick(EditPointView.parseStateToPoint(this._state));
   };
 
@@ -372,12 +432,36 @@ export default class EditPointView extends AbstractStatefulView {
     const destination = getDestinationByName(this._state.destinations, evt.target.value);
 
     if (!destination) {
+      this.updateElement({
+        destinationId: null,
+        destination: undefined,
+      });
+
       return;
     }
 
     this.updateElement({
       destinationId: destination.id,
       destination,
+    });
+  };
+
+  #offerChangeHandler = (evt) => {
+    if (!evt.target.classList.contains('event__offer-checkbox')) {
+      return;
+    }
+
+    const offerId = evt.target.value;
+    const offerIds = new Set(this._state.offerIds);
+
+    if (evt.target.checked) {
+      offerIds.add(offerId);
+    } else {
+      offerIds.delete(offerId);
+    }
+
+    this._setState({
+      offerIds: Array.from(offerIds),
     });
   };
 
@@ -388,14 +472,14 @@ export default class EditPointView extends AbstractStatefulView {
   };
 
   #startDateChangeHandler = ([userDate]) => {
-    this.updateElement({
-      startDateTime: userDate.toISOString(),
+    this._setState({
+      startDateTime: userDate ? userDate.toISOString() : null,
     });
   };
 
   #endDateChangeHandler = ([userDate]) => {
-    this.updateElement({
-      endDateTime: userDate.toISOString(),
+    this._setState({
+      endDateTime: userDate ? userDate.toISOString() : null,
     });
   };
 
@@ -405,6 +489,7 @@ export default class EditPointView extends AbstractStatefulView {
       isDisabled: false,
       isSaving: false,
       isDeleting: false,
+      isNewPoint: point.isNewPoint ?? false,
     };
   }
 
@@ -419,6 +504,7 @@ export default class EditPointView extends AbstractStatefulView {
     delete point.isDisabled;
     delete point.isSaving;
     delete point.isDeleting;
+    delete point.isNewPoint;
 
     return point;
   }
